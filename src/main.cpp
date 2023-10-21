@@ -10,6 +10,20 @@
 // Color defines
 #define DARKER_GREY 0x18E0
 
+// The display size is known
+#define SIZE_Y 240
+#define SIZE_X 320
+#define CENTER_Y (SIZE_Y / 2)
+#define CENTER_X (SIZE_X / 2)
+
+// LoRa UI indicator
+#define LORA_ICON_RADIUS 10
+#define LORA_ICON_DIAMETER (2 * LORA_ICON_RADIUS)
+#define LORA_ICON_X (SIZE_X - LORA_ICON_RADIUS)
+#define LORA_ICON_Y LORA_ICON_RADIUS
+#define LORA_ICON_LEFT (SIZE_X - LORA_ICON_DIAMETER)
+#define LORA_ICON_TOP (SIZE_X - LORA_ICON_RADIUS)
+
 // Spedometer UI constants
 #define SPEDOMETER_RADIUS 90
 #define METER_ARC_OUTSIDE (SPEDOMETER_RADIUS - 3)
@@ -20,12 +34,9 @@
 // Maximum **REPORTED** speed
 #define MAX_SPEED 30
 
-// The LCD size is known
-#define CENTER_Y 120
-#define CENTER_X 160
-
 // Function declarations
 void update_spedometer();
+void update_lora_status();
 
 // Values are fetched from LoRa transceiver
 // Having them as globals allow them to be accessed easily across tasks
@@ -38,7 +49,7 @@ bool lora_communicating = false;
 TFT_eSPI tft = TFT_eSPI();
 
 void setup() {
-  // Initialize LCD
+  // Initialize display
   tft.init();
   tft.setRotation(3);
   tft.fillScreen(TFT_BLACK);
@@ -55,24 +66,49 @@ void setup() {
 
 void loop() {
   update_spedometer();
+  update_lora_status();
   // speed = random(31);
+  lora_communicating = !lora_communicating;
   speed = (speed + 1) % 31;
-  // delay(random(2000));
+  delay(random(2000));
   delay(200);
 }
 
 void update_spedometer() {
   static unsigned short last_angle = METER_ARC_START_ANGLE;
 
+  // Calculate position on meter for a given speed
   unsigned short cur_speed_angle = map(speed, 0, MAX_SPEED, METER_ARC_START_ANGLE, METER_ARC_END_ANGLE);
+
+  // Only update the display on changes
   if (cur_speed_angle != last_angle) {
+    // Hide previous number
     tft.fillCircle(CENTER_X, CENTER_Y, METER_ARC_INSIDE, DARKER_GREY);
+    // Ensure the colors are correct
     tft.setTextColor(TFT_WHITE, DARKER_GREY);
     tft.drawNumber(speed, CENTER_X, CENTER_Y);
+    // Draw only part of the arc based on how much the speed changed
     if (cur_speed_angle > last_angle)
       tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, last_angle, cur_speed_angle, TFT_GREEN, TFT_BLACK);
     else
       tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, cur_speed_angle, last_angle, TFT_BLACK, DARKER_GREY);
+    
     last_angle = cur_speed_angle;
+  }
+}
+
+void update_lora_status() {
+  static bool last_status = !lora_communicating;
+
+  if (!(last_status && lora_communicating)) {
+    // Draw over last icon
+    tft.fillRect(LORA_ICON_LEFT, 0, LORA_ICON_DIAMETER + 1, LORA_ICON_DIAMETER + 1, TFT_BLACK);
+
+    // Show communication indicators
+    if (lora_communicating)
+      tft.fillSmoothCircle(LORA_ICON_X, LORA_ICON_Y, LORA_ICON_RADIUS, TFT_GREEN, TFT_BLACK);
+    else
+      tft.fillTriangle(LORA_ICON_LEFT, LORA_ICON_DIAMETER, LORA_ICON_TOP, 0, SIZE_X, LORA_ICON_DIAMETER, TFT_BLUE);
+    last_status = lora_communicating;
   }
 }
