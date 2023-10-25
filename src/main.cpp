@@ -71,6 +71,8 @@ void setup() {
   tft.drawSmoothCircle(CENTER_X, CENTER_Y, SPEDOMETER_RADIUS, TFT_SILVER, DARKER_GREY);
   tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, METER_ARC_START_ANGLE, METER_ARC_END_ANGLE, TFT_BLACK, DARKER_GREY);
 
+  tft.drawCentreString("Sup *DUDE*", CENTER_X, 0, 1);
+
   // Shared text drawing parameters
   tft.setTextDatum(MC_DATUM);
   tft.setTextFont(8);
