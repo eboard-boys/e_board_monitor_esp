@@ -59,6 +59,7 @@ TFT_eSPI tft = TFT_eSPI();
 // For communication over UART
 SoftwareSerial controller_com(RX, TX);
 
+// Do this at start of run
 void setup() {
   // Initialize display
   tft.init();
@@ -75,6 +76,7 @@ void setup() {
   tft.setTextFont(8);
 }
 
+// Do this task indefinitely
 void loop() {
   static int skip_display_update = 1000;
 
@@ -97,6 +99,7 @@ void loop() {
   if (skip_display_update <= 0) {skip_display_update = 1000;}
 }
 
+// Update the spedometer UI display
 void update_spedometer() {
   static unsigned short last_angle = METER_ARC_START_ANGLE;
 
@@ -120,6 +123,7 @@ void update_spedometer() {
   }
 }
 
+// Update LoRa communication UI status
 void update_lora_status() {
   static bool last_status = !lora_communicating;
 
@@ -131,7 +135,7 @@ void update_lora_status() {
     if (lora_communicating)
       tft.fillSmoothCircle(LORA_ICON_X, LORA_ICON_Y, LORA_ICON_RADIUS, TFT_GREEN, TFT_BLACK);
     else
-      tft.fillTriangle(LORA_ICON_LEFT, LORA_ICON_DIAMETER, LORA_ICON_TOP, 0, SIZE_X, LORA_ICON_DIAMETER, TFT_BLUE);
+      tft.fillTriangle(LORA_ICON_LEFT, LORA_ICON_DIAMETER, LORA_ICON_TOP, 0, SIZE_X, LORA_ICON_DIAMETER, TFT_RED);
     last_status = lora_communicating;
   }
 }
