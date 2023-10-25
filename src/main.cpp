@@ -6,6 +6,14 @@
 #include <TFT_eSPI.h>
 #include <TFT_eWidget.h>  // Widget library
 #include <SD.h>
+#include <SoftwareSerial.h>
+
+// UART serial (used instead of LoRa for now)
+#define TX 32
+#define RX 33
+
+// ADC
+#define POT 34
 
 // Color defines
 #define DARKER_GREY 0x18E0
@@ -32,7 +40,7 @@
 #define METER_ARC_END_ANGLE 330
 
 // Maximum **REPORTED** speed
-#define MAX_SPEED 30
+#define MAX_SPEED 100
 
 // Function declarations
 void update_spedometer();
@@ -47,6 +55,9 @@ bool lora_communicating = false;
 
 // For accessing display methods
 TFT_eSPI tft = TFT_eSPI();
+
+// For communication over UART
+SoftwareSerial controller_com(RX, TX);
 
 void setup() {
   // Initialize display
@@ -65,13 +76,25 @@ void setup() {
 }
 
 void loop() {
-  update_spedometer();
-  update_lora_status();
-  // speed = random(31);
-  lora_communicating = !lora_communicating;
-  speed = (speed + 1) % 31;
-  delay(random(2000));
-  delay(200);
+  static int skip_display_update = 1000;
+
+  // Read and process the throttle value
+  uint16_t cur_throttle = analogRead(POT);
+  speed = map(cur_throttle, 0, 4096, 0, 100);
+  Serial.println(cur_throttle);
+  // Check for serial communication; this variable is a misnomer for now
+  lora_communicating = controller_com;
+  // Write throttle value between 0 and 100 over serial
+  controller_com.println(cur_throttle);
+
+  skip_display_update = skip_display_update - 1;
+
+  if (!skip_display_update) {
+    // Update displays
+    update_spedometer();
+    update_lora_status();
+  }
+  if (skip_display_update <= 0) {skip_display_update = 1000;}
 }
 
 void update_spedometer() {
