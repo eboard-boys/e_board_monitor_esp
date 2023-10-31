@@ -24,7 +24,7 @@
 #define CENTER_Y (SIZE_Y / 2)
 #define CENTER_X (SIZE_X / 2)
 
-// LoRa UI indicator
+// Communication Status UI constants
 #define LORA_ICON_RADIUS 10
 #define LORA_ICON_DIAMETER (2 * LORA_ICON_RADIUS)
 #define LORA_ICON_X (SIZE_X - LORA_ICON_RADIUS)
