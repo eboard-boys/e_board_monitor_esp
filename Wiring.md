@@ -15,8 +15,8 @@ Pin 3v3: VCC (3.3 volts)
 #### Lora Wireless TX/RX Tranciever
 Pin 3v3: VDD (3.3 volts ONLY)
 <br>Pin Gnd: GND (Ground)
-<br>Pin D32 (Pin 32 as TX): RX on the Transceiver
-<br>Pin D33 (Pin 33 as RX): TX on the Transeiver
+<br>Pin D32 (Pin 16 as TX): RX on the Transceiver
+<br>Pin D33 (Pin 17 as RX): TX on the Transeiver
 
 #### Throttle Control via Poteniometer
 Pin 3v3: Same as for LCD Display

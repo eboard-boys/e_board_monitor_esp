@@ -61,6 +61,12 @@ SoftwareSerial controller_com(RX, TX);
 
 // Do this at start of run
 void setup() {
+  
+  //Initialize Serial
+  Serial2.begin(115200);
+  Serial2.println("AT");
+  Serial2.write("AT+ADDRESS=25");
+  
   // Initialize display
   tft.init();
   tft.setRotation(3);
@@ -69,7 +75,8 @@ void setup() {
   // Initial drawing of spedometer
   tft.fillCircle(CENTER_X, CENTER_Y, SPEDOMETER_RADIUS, DARKER_GREY);
   tft.drawSmoothCircle(CENTER_X, CENTER_Y, SPEDOMETER_RADIUS, TFT_SILVER, DARKER_GREY);
-  tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, METER_ARC_START_ANGLE, METER_ARC_END_ANGLE, TFT_BLACK, DARKER_GREY);
+  tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, METER_ARC_START_ANGLE, 
+    METER_ARC_END_ANGLE, TFT_BLACK, DARKER_GREY);
 
   tft.drawCentreString("Sup *DUDE*", CENTER_X, 0, 1);
 
@@ -84,8 +91,10 @@ void loop() {
 
   // Read and process the throttle value
   uint16_t cur_throttle = analogRead(POT);
-  speed = map(cur_throttle, 0, 4096, 0, 100);
+  speed = map(cur_throttle, 0, 4096, 0, 100); // Throttle value mapped between 0 and 100
   Serial.println(cur_throttle);
+  //Serial2.println("AT+SEND=25,2,%i", cur_throttle); // Send throttle value via AT+ command
+
   // Check for serial communication; this variable is a misnomer for now
   lora_communicating = controller_com;
   // Write throttle value between 0 and 100 over serial
@@ -98,7 +107,8 @@ void loop() {
     update_spedometer();
     update_lora_status();
   }
-  if (skip_display_update <= 0) {skip_display_update = 1000;}
+  if (skip_display_update <= 0) skip_display_update = 1000;
+
 }
 
 // Update the spedometer UI display
@@ -106,7 +116,8 @@ void update_spedometer() {
   static unsigned short last_angle = METER_ARC_START_ANGLE;
 
   // Calculate position on meter for a given speed
-  unsigned short cur_speed_angle = map(speed, 0, MAX_SPEED, METER_ARC_START_ANGLE, METER_ARC_END_ANGLE);
+  unsigned short cur_speed_angle = map(speed, 0, MAX_SPEED, METER_ARC_START_ANGLE, 
+    METER_ARC_END_ANGLE);
 
   // Only update the display on changes
   if (cur_speed_angle != last_angle) {
@@ -117,9 +128,11 @@ void update_spedometer() {
     tft.drawNumber(speed, CENTER_X, CENTER_Y);
     // Draw only part of the arc based on how much the speed changed
     if (cur_speed_angle > last_angle)
-      tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, last_angle, cur_speed_angle, TFT_GREEN, TFT_BLACK);
+      tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, last_angle, 
+        cur_speed_angle, TFT_GREEN, TFT_BLACK);
     else
-      tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, cur_speed_angle, last_angle, TFT_BLACK, DARKER_GREY);
+      tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, cur_speed_angle, 
+        last_angle, TFT_BLACK, DARKER_GREY);
     
     last_angle = cur_speed_angle;
   }
@@ -137,7 +150,8 @@ void update_lora_status() {
     if (lora_communicating)
       tft.fillSmoothCircle(LORA_ICON_X, LORA_ICON_Y, LORA_ICON_RADIUS, TFT_GREEN, TFT_BLACK);
     else
-      tft.fillTriangle(LORA_ICON_LEFT, LORA_ICON_DIAMETER, LORA_ICON_TOP, 0, SIZE_X, LORA_ICON_DIAMETER, TFT_RED);
+      tft.fillTriangle(LORA_ICON_LEFT, LORA_ICON_DIAMETER, LORA_ICON_TOP, 0, SIZE_X, 
+        LORA_ICON_DIAMETER, TFT_RED);
     last_status = lora_communicating;
   }
 }
