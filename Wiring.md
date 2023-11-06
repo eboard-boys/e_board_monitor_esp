@@ -16,7 +16,9 @@ Pin 3v3: VCC (3.3 volts)
 Pin 3v3: VDD (3.3 volts ONLY)
 <br>Pin Gnd: GND (Ground)
 <br>Pin D32 (Pin 16 as TX): RX on the Transceiver
-<br>Pin D33 (Pin 17 as RX): TX on the Transeiver
+<br>Pin D33 (Pin 17 as RX): TX on the Transceiver
+<br>Pin D16 (Pin ?? as RX): TX on the Transceiver
+<br>Pin D17 (Pin ?? as TX): RX on the Transceiver
 
 #### Throttle Control via Poteniometer
 Pin 3v3: Same as for LCD Display

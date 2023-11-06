@@ -12,6 +12,10 @@
 #define TX 32
 #define RX 33
 
+// According to: https://circuits4you.com/2018/12/31/esp32-hardware-serial2-example/
+#define TX_0 41 // UART0 TX Pin
+#define RX_0 40 // UART0 RX Pin
+
 // ADC
 #define POT 34
 
