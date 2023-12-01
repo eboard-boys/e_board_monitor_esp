@@ -7,14 +7,15 @@
 #include <TFT_eWidget.h>  // Widget library
 #include <SD.h>
 #include <SoftwareSerial.h>
+#include <string.h>
 
 // UART serial (used instead of LoRa for now)
 #define TX 32
 #define RX 33
 
 // According to: https://circuits4you.com/2018/12/31/esp32-hardware-serial2-example/
-#define TX_0 41 // UART0 TX Pin
-#define RX_0 40 // UART0 RX Pin
+#define TX_2 17 // UART2 TX2 Pin
+#define RX_2 16 // UART2 RX2 Pin
 
 // ADC
 #define POT 34
@@ -61,15 +62,19 @@ bool lora_communicating = false;
 TFT_eSPI tft = TFT_eSPI();
 
 // For communication over UART
-SoftwareSerial controller_com(RX, TX);
+SoftwareSerial controller_com(RX_2, TX_2);
 
 // Do this at start of run
 void setup() {
   
   //Initialize Serial
-  Serial2.begin(115200);
+  Serial2.begin(9600);
   Serial2.println("AT");
   Serial2.write("AT+ADDRESS=25");
+
+  //Initialize Software Serial
+  controller_com.begin(115200);
+  controller_com.println("AT");
   
   // Initialize display
   tft.init();
@@ -96,13 +101,22 @@ void loop() {
   // Read and process the throttle value
   uint16_t cur_throttle = analogRead(POT);
   speed = map(cur_throttle, 0, 4096, 0, 100); // Throttle value mapped between 0 and 100
-  Serial.println(cur_throttle);
-  //Serial2.println("AT+SEND=25,2,%i", cur_throttle); // Send throttle value via AT+ command
+  //Serial.println(cur_throttle);
 
-  // Check for serial communication; this variable is a misnomer for now
-  lora_communicating = controller_com;
-  // Write throttle value between 0 and 100 over serial
-  controller_com.println(cur_throttle);
+
+  // Check for serial communication
+  lora_communicating = true;
+
+
+  // Write throttle value between 0 and 10 0 over serial
+  // controller_com.println(cur_throttle);
+  // // Write the throttle value over serial via AT Command
+  
+
+  char data[25] = "";
+  sprintf(data, "AT+SEND, 25, 4, %i", cur_throttle); // Convert the throttle into a char array to be sent
+  Serial2.println(data); // Send throttle value via AT+ command
+  controller_com.println(data);
 
   skip_display_update = skip_display_update - 1;
 
