@@ -6,12 +6,7 @@
 #include <TFT_eSPI.h>
 #include <TFT_eWidget.h>  // Widget library
 #include <SD.h>
-#include <SoftwareSerial.h>
 #include <string.h>
-
-// UART serial (used instead of LoRa for now)
-#define TX 32
-#define RX 33
 
 // According to: https://circuits4you.com/2018/12/31/esp32-hardware-serial2-example/
 #define TX_2 17 // UART2 TX2 Pin
@@ -38,7 +33,7 @@
 #define LORA_ICON_TOP (SIZE_X - LORA_ICON_RADIUS)
 
 // Spedometer UI constants
-#define SPEDOMETER_RADIUS 90
+#define SPEDOMETER_RADIUS 80  // Was 90
 #define METER_ARC_OUTSIDE (SPEDOMETER_RADIUS - 3)
 #define METER_ARC_INSIDE METER_ARC_OUTSIDE - (METER_ARC_OUTSIDE / 5)
 #define METER_ARC_START_ANGLE 30
@@ -48,12 +43,15 @@
 #define MAX_SPEED 100
 
 // Function declarations
-void update_spedometer();
+void update_throttle_display();
 void update_lora_status();
+void update_trip(float distance);
+void display_speed();
 
 // Values are fetched from LoRa transceiver
 // Having them as globals allow them to be accessed easily across tasks
 byte speed = 0;
+byte throttle = 0;
 byte battery_temp = 0;
 unsigned long trip_odometer = 0;
 bool lora_communicating = false;
@@ -61,21 +59,18 @@ bool lora_communicating = false;
 // For accessing display methods
 TFT_eSPI tft = TFT_eSPI();
 
-// For communication over UART
-SoftwareSerial controller_com(RX_2, TX_2);
-
 // Do this at start of run
 void setup() {
   
-  //Initialize Serial
-  Serial2.begin(9600);
-  Serial2.println("AT");
-  Serial2.write("AT+ADDRESS=25");
+  // Initialize Serial2
 
-  //Initialize Software Serial
-  controller_com.begin(115200);
-  controller_com.println("AT");
-  
+  // Set the network ID 3 of Reyax LoRa
+
+  // Set the address of Reyax LoRa
+
+  // Send AT command to verify things are working
+
+
   // Initialize display
   tft.init();
   tft.setRotation(3);
@@ -87,7 +82,7 @@ void setup() {
   tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, METER_ARC_START_ANGLE, 
     METER_ARC_END_ANGLE, TFT_BLACK, DARKER_GREY);
 
-  tft.drawCentreString("Sup *DUDE*", CENTER_X, 0, 1);
+  tft.drawCentreString("Trip: ", CENTER_X-15, 230, 1);
 
   // Shared text drawing parameters
   tft.setTextDatum(MC_DATUM);
@@ -116,13 +111,12 @@ void loop() {
   char data[25] = "";
   sprintf(data, "AT+SEND, 25, 4, %i", cur_throttle); // Convert the throttle into a char array to be sent
   Serial2.println(data); // Send throttle value via AT+ command
-  controller_com.println(data);
 
   skip_display_update = skip_display_update - 1;
 
   if (!skip_display_update) {
     // Update displays
-    update_spedometer();
+    update_throttle_display();
     update_lora_status();
   }
   if (skip_display_update <= 0) skip_display_update = 1000;
@@ -130,46 +124,94 @@ void loop() {
 }
 
 // Update the spedometer UI display
-void update_spedometer() {
+void update_throttle_display() {
   static unsigned short last_angle = METER_ARC_START_ANGLE;
 
   // Calculate position on meter for a given speed
-  unsigned short cur_speed_angle = map(speed, 0, MAX_SPEED, METER_ARC_START_ANGLE, 
+  unsigned short cur_throttle_angle = map(throttle, 0, MAX_SPEED, METER_ARC_START_ANGLE, 
     METER_ARC_END_ANGLE);
 
   // Only update the display on changes
-  if (cur_speed_angle != last_angle) {
+  if (cur_throttle_angle != last_angle) {
     // Hide previous number
     tft.fillCircle(CENTER_X, CENTER_Y, METER_ARC_INSIDE, DARKER_GREY);
     // Ensure the colors are correct
     tft.setTextColor(TFT_WHITE, DARKER_GREY);
-    tft.drawNumber(speed, CENTER_X, CENTER_Y);
+    tft.drawNumber(throttle, CENTER_X, CENTER_Y);
     // Draw only part of the arc based on how much the speed changed
-    if (cur_speed_angle > last_angle)
+    if (cur_throttle_angle > last_angle)
       tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, last_angle, 
-        cur_speed_angle, TFT_GREEN, TFT_BLACK);
+        cur_throttle_angle, TFT_GREEN, TFT_BLACK);
     else
-      tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, cur_speed_angle, 
+      tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, cur_throttle_angle, 
         last_angle, TFT_BLACK, DARKER_GREY);
     
-    last_angle = cur_speed_angle;
+    last_angle = cur_throttle_angle;
   }
+}
+
+void display_speed()
+{
+  // Check if LoRa recieved speed
+  // Take the message and save only "S<number>"
+
+  // Convert the number to a string
+
+  // Display the number_text on the LCD right below throttle
+  tft.drawString("speed!", CENTER_X, 180);
+}
+
+
+
+void update_trip(float distance)
+{
+
+  // compound distance to the odometer
+  trip_odometer += distance;
+
+  // convert odometer value to string
+  String text_odometer = String(trip_odometer, 3);
+
+  // Display the odometer
+  tft.drawCentreString(text_odometer, CENTER_X+5, 230, 1);
 }
 
 // Update LoRa communication UI status
 void update_lora_status() {
+  
   static bool last_status = !lora_communicating;
 
+  // if one or both are not HIGH
   if (!(last_status && lora_communicating)) {
     // Draw over last icon
     tft.fillRect(LORA_ICON_LEFT, 0, LORA_ICON_DIAMETER + 1, LORA_ICON_DIAMETER + 1, TFT_BLACK);
 
     // Show communication indicators
     if (lora_communicating)
+    {
       tft.fillSmoothCircle(LORA_ICON_X, LORA_ICON_Y, LORA_ICON_RADIUS, TFT_GREEN, TFT_BLACK);
+      delay(1);
+    }
     else
+    {
       tft.fillTriangle(LORA_ICON_LEFT, LORA_ICON_DIAMETER, LORA_ICON_TOP, 0, SIZE_X, 
-        LORA_ICON_DIAMETER, TFT_RED);
+      LORA_ICON_DIAMETER, TFT_RED);
+      delay(1);
+    }
+      
     last_status = lora_communicating;
+  }
+}
+
+void check_lora_status() 
+{
+  static bool last_status = !lora_communicating;
+
+  if (!(last_status && lora_communicating)) 
+  {
+    if (lora_communicating)
+    {
+      
+    }
   }
 }
