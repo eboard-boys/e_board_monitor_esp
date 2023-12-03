@@ -44,7 +44,7 @@
 
 // Function declarations
 void update_throttle_display();
-void update_lora_status();
+void update_lora_icon();
 void update_trip(float distance);
 void display_speed();
 
@@ -95,29 +95,26 @@ void loop() {
 
   // Read and process the throttle value
   uint16_t cur_throttle = analogRead(POT);
-  speed = map(cur_throttle, 0, 4096, 0, 100); // Throttle value mapped between 0 and 100
-  //Serial.println(cur_throttle);
-
-
-  // Check for serial communication
-  lora_communicating = true;
-
-
-  // Write throttle value between 0 and 10 0 over serial
-  // controller_com.println(cur_throttle);
-  // // Write the throttle value over serial via AT Command
-  
+  speed = map(cur_throttle, 0, 4096, 0, 100); // Map throttle value between [0, 100]
 
   char data[25] = "";
-  sprintf(data, "AT+SEND, 25, 4, %i", cur_throttle); // Convert the throttle into a char array to be sent
-  Serial2.println(data); // Send throttle value via AT+ command
+  sprintf(data, "AT+SEND, 25, 4, %i", cur_throttle);  // Convert the throttle into a char array to be sent
+  Serial2.println(data);                              // Send throttle value via AT+ command
 
-  skip_display_update = skip_display_update - 1;
+  // Decrement the skip timer
+  skip_display_update -= 1;
 
+  // Check for serial communication
+  if (Serial2.available()) lora_communicating = true;
+  else lora_communicating = false;
+
+  // Is this to give an artificial timer for the screen update?
   if (!skip_display_update) {
     // Update displays
     update_throttle_display();
-    update_lora_status();
+    update_lora_icon();
+    update_trip(0.01);  // Temporarily takes in a constant 0.01 miles
+    display_speed();
   }
   if (skip_display_update <= 0) skip_display_update = 1000;
 
@@ -150,6 +147,7 @@ void update_throttle_display() {
   }
 }
 
+// Read the received speed value and display on the LCD
 void display_speed()
 {
   // Check if LoRa recieved speed
@@ -161,8 +159,7 @@ void display_speed()
   tft.drawString("speed!", CENTER_X, 180);
 }
 
-
-
+// Keep track of total trip distance and display on the LCD
 void update_trip(float distance)
 {
 
@@ -177,7 +174,7 @@ void update_trip(float distance)
 }
 
 // Update LoRa communication UI status
-void update_lora_status() {
+void update_lora_icon() {
   
   static bool last_status = !lora_communicating;
 
@@ -189,29 +186,16 @@ void update_lora_status() {
     // Show communication indicators
     if (lora_communicating)
     {
+      // Draw comm good icon
       tft.fillSmoothCircle(LORA_ICON_X, LORA_ICON_Y, LORA_ICON_RADIUS, TFT_GREEN, TFT_BLACK);
-      delay(1);
     }
     else
     {
+      // Draw comm failure icon
       tft.fillTriangle(LORA_ICON_LEFT, LORA_ICON_DIAMETER, LORA_ICON_TOP, 0, SIZE_X, 
       LORA_ICON_DIAMETER, TFT_RED);
-      delay(1);
     }
       
     last_status = lora_communicating;
-  }
-}
-
-void check_lora_status() 
-{
-  static bool last_status = !lora_communicating;
-
-  if (!(last_status && lora_communicating)) 
-  {
-    if (lora_communicating)
-    {
-      
-    }
   }
 }
