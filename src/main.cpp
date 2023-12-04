@@ -18,6 +18,10 @@
 // Color defines
 #define DARKER_GREY 0x18E0
 
+// Display orientation
+#define ORIENTATION_LEFT_HAND 1
+#define ORIENTATION_RIGHT_HAND 3
+
 // The display size is known
 #define SIZE_Y 240
 #define SIZE_X 320
@@ -73,7 +77,7 @@ void setup() {
 
   // Initialize display
   tft.init();
-  tft.setRotation(3);
+  tft.setRotation(ORIENTATION_LEFT_HAND);
   tft.fillScreen(TFT_BLACK);
   
   // Initial drawing of spedometer
