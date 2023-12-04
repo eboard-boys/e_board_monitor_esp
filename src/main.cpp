@@ -65,10 +65,13 @@ void setup() {
   // Initialize Serial2
 
   // Set the network ID 3 of Reyax LoRa
+  Serial.println("AT+NETWORKID=3");
 
   // Set the address of Reyax LoRa
+  Serial2.println("AT+ADDRESS=25");
 
   // Send AT command to verify things are working
+  Serial2.println("AT");
 
 
   // Initialize display
