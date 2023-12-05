@@ -11,9 +11,9 @@
 // According to: https://circuits4you.com/2018/12/31/esp32-hardware-serial2-example/
 #define TX_2 17 // UART2 TX2 Pin
 #define RX_2 16 // UART2 RX2 Pin
-
-// ADC
-#define POT 34
+#define STM_Addr 24 // STM LoRa chip address (the longboard)
+#define ESP_Addr 25 // ESP LoRa chip address (this device)
+#define POT 34      // ADC
 
 // Color defines
 #define DARKER_GREY 0x18E0
@@ -43,20 +43,22 @@
 #define METER_ARC_START_ANGLE 30
 #define METER_ARC_END_ANGLE 330
 
-// Maximum **REPORTED** speed
-#define MAX_SPEED 100
+// Maximum **REPORTED** throttle
+#define FULL_THROTTLE 100
 
 // Function declarations
 void update_throttle_display();
 void update_lora_icon();
 void update_trip(float distance);
 void display_speed();
+void sendLoRa();
 
 // Values are fetched from LoRa transceiver
 // Having them as globals allow them to be accessed easily across tasks
 byte speed = 0;
 byte throttle = 0;
 byte battery_temp = 0;
+char rawMsg[5];
 unsigned long trip_odometer = 0;
 bool lora_communicating = false;
 
@@ -67,16 +69,26 @@ TFT_eSPI tft = TFT_eSPI();
 void setup() {
   
   // Initialize Serial2
+  Serial2.begin(115200, SERIAL_8N1, RX_2, TX_2);
+  delay(1000);
 
-  // Set the network ID 3 of Reyax LoRa
-  Serial.println("AT+NETWORKID=3");
-
-  // Set the address of Reyax LoRa
+  // Set parameters and check parameters
   Serial2.println("AT+ADDRESS=25");
-
-  // Send AT command to verify things are working
-  Serial2.println("AT");
-
+  delay(500);
+  Serial2.println("AT+NETWORKID=3");
+  delay(500);
+  Serial2.println("AT+CPIN?");
+  delay(500);
+  Serial2.println("AT+CRFOP?");
+  delay(500);
+  Serial2.println("AT+ADDRESS?");
+  delay(500);
+  Serial2.println("AT+NETWORKID?");
+  delay(500);
+  Serial2.println("AT+BAND?");
+  delay(500);
+  Serial2.println("AT+MODE=0");
+  delay(500);
 
   // Initialize display
   tft.init();
@@ -89,8 +101,6 @@ void setup() {
   tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, METER_ARC_START_ANGLE, 
     METER_ARC_END_ANGLE, TFT_BLACK, DARKER_GREY);
 
-  tft.drawCentreString("Trip: ", CENTER_X-15, 230, 1);
-
   // Shared text drawing parameters
   tft.setTextDatum(MC_DATUM);
   tft.setTextFont(8);
@@ -102,26 +112,42 @@ void loop() {
 
   // Read and process the throttle value
   uint16_t cur_throttle = analogRead(POT);
-  speed = map(cur_throttle, 0, 4096, 0, 100); // Map throttle value between [0, 100]
-
-  char data[25] = "";
-  sprintf(data, "AT+SEND, 25, 4, %i", cur_throttle);  // Convert the throttle into a char array to be sent
-  Serial2.println(data);                              // Send throttle value via AT+ command
+  // throttle = map(cur_throttle, 0, 4096, 0, 100); // Map throttle value between [0, 100]
+  throttle = 25;
+  
+  sprintf(rawMsg, "S%i", throttle);  // Convert the throttle into a char array to be sent
+  sendLoRa();                              // Send throttle value via AT+ command
 
   // Decrement the skip timer
   skip_display_update -= 1;
 
   // Check for serial communication
-  if (Serial2.available()) lora_communicating = true;
-  else lora_communicating = false;
+  if (Serial2.available())
+  {
+    lora_communicating = true;
+    String junk = Serial2.readString();
+    String message = Serial2.readString();
+    Serial.println(junk);
+    Serial.println(message);
+  } 
+  else 
+  {
+    lora_communicating = false;
+    Serial.println("Nothing received");
+  }
+  delay(500);
 
   // Is this to give an artificial timer for the screen update?
   if (!skip_display_update) {
     // Update displays
     update_throttle_display();
     update_lora_icon();
-    update_trip(0.01);  // Temporarily takes in a constant 0.01 miles
-    display_speed();
+
+    // If moving update odometer
+    if (speed >= 0.5)
+    {
+      update_trip(0.1);  // Temporarily takes in a constant 0.01 miles
+    }
   }
   if (skip_display_update <= 0) skip_display_update = 1000;
 
@@ -132,16 +158,15 @@ void update_throttle_display() {
   static unsigned short last_angle = METER_ARC_START_ANGLE;
 
   // Calculate position on meter for a given speed
-  unsigned short cur_throttle_angle = map(throttle, 0, MAX_SPEED, METER_ARC_START_ANGLE, 
+  unsigned short cur_throttle_angle = map(throttle, 0, FULL_THROTTLE, METER_ARC_START_ANGLE, 
     METER_ARC_END_ANGLE);
 
   // Only update the display on changes
   if (cur_throttle_angle != last_angle) {
     // Hide previous number
     tft.fillCircle(CENTER_X, CENTER_Y, METER_ARC_INSIDE, DARKER_GREY);
-    // Ensure the colors are correct
-    tft.setTextColor(TFT_WHITE, DARKER_GREY);
-    tft.drawNumber(throttle, CENTER_X, CENTER_Y);
+    // Display speed on the LCD
+    display_speed();
     // Draw only part of the arc based on how much the speed changed
     if (cur_throttle_angle > last_angle)
       tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, last_angle, 
@@ -159,25 +184,39 @@ void display_speed()
 {
   // Check if LoRa recieved speed
   // Take the message and save only "S<number>"
-
-  // Convert the number to a string
-
+  speed = 13;
+  // Ensure the colors are correct
+  tft.setTextColor(TFT_WHITE, DARKER_GREY);
+  // Reset Text Size
+  tft.setTextSize(1);
   // Display the number_text on the LCD right below throttle
-  tft.drawString("speed!", CENTER_X, 180);
+  tft.drawNumber(speed, CENTER_X, CENTER_Y);
+  // Adjust text size for speed units
+  tft.setTextSize(2);
+  tft.drawCentreString("MPH", CENTER_X, 220, 1);
+
 }
 
 // Keep track of total trip distance and display on the LCD
 void update_trip(float distance)
 {
-
   // compound distance to the odometer
-  trip_odometer += distance;
-
-  // convert odometer value to string
-  String text_odometer = String(trip_odometer, 3);
-
+  //trip_odometer += distance;
+  trip_odometer = distance;
+  // Adjust text size for trip
+  tft.setTextSize(2);
   // Display the odometer
-  tft.drawCentreString(text_odometer, CENTER_X+5, 230, 1);
+  tft.drawString("Trip: 1.5 km", 75, 10, 1);
+  // tft.setTextSize(1);
+  // tft.drawNumber(trip_odometer, 30, 0); // Text is too big
+}
+
+// put function definitions here:
+void sendLoRa() {
+  char msg[100] = "";
+	sprintf(msg, "AT+SEND=%i,%i,%s", STM_Addr, strlen(rawMsg), rawMsg);
+	Serial2.println(msg);
+	delay(1000);
 }
 
 // Update LoRa communication UI status
