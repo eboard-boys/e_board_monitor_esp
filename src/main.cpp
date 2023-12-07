@@ -95,6 +95,7 @@ void task_sendLora(void * parameters)
     char msg[100] = "";
 	  sprintf(msg, "AT+SEND=%i,%i,%s", STM_Addr, strlen(rawMsg), rawMsg);
 	  Serial2.println(msg);
+    Serial.println(msg); // Print back to USB
     vTaskDelay(LoRa_Delay / portTICK_PERIOD_MS); // Delay for other tasks to run
   }
   
@@ -153,19 +154,19 @@ void setup() {
         "UI_Update",    // A description name of the task
         1000,           // stack size
         NULL,           // task parameters
-        1,              // task priority
+        2,              // task priority
         NULL            // task handle
         );
 
-  // // Create the task as outlined above as "send_LoRa"
-  // xTaskCreate(
-  //       task_sendLora,  // task function name
-  //       "send_LoRa",    // A description name of the task
-  //       1000,           // stack size
-  //       NULL,           // task parameters
-  //       1,              // task priority
-  //       NULL            // task handle
-  //       );
+  // Create the task as outlined above as "send_LoRa"
+  xTaskCreate(
+        task_sendLora,  // task function name
+        "send_LoRa",    // A description name of the task
+        1000,           // stack size
+        NULL,           // task parameters
+        1,              // task priority
+        NULL            // task handle
+        );
 }
 
 // Do this task indefinitely
@@ -181,14 +182,14 @@ void loop() {
   if (throttle < 0 || throttle > 100) throttle = 0; // Make sure 0 throttle doesn't go negative
 
   sprintf(rawMsg, "S%i", throttle);  // Convert the throttle into a char array to be sent
-  sendLoRa();                              // Send throttle value via AT+ command
+  // sendLoRa();                              // Send throttle value via AT+ command
 
   // Check for serial communication
   if (Serial2.available())
   {
     lora_communicating = true;
     // String junk = Serial2.readString();
-    // String message = Serial2.readString();
+    String message = Serial2.readString();
     // Serial.println(junk);
     // Serial.println(message);
   } 
@@ -251,21 +252,15 @@ void update_trip(float distance)
   // compound distance to the odometer
   //trip_odometer += distance;
   trip_odometer = distance;
+
+  String someText = "hello";
   // Adjust text size for trip
   tft.setTextSize(2);
   // Display the odometer
-  tft.drawString("Trip: 1.5 km", 75, 10, 1);
+  //tft.drawString("Trip: 1.5 km", 75, 10, 1);
+  tft.drawString(someText, 75, 10, 1);
   // tft.setTextSize(1);
   // tft.drawNumber(trip_odometer, 30, 0); // Text is too big
-}
-
-// Create char message containing AT command and send it:
-void sendLoRa() {
-  char msg[100] = "";
-	sprintf(msg, "AT+SEND=%i,%i,%s", STM_Addr, strlen(rawMsg), rawMsg);
-	Serial2.println(msg);
-  //Serial.println("sendLoRa happened");
-  Serial.println(msg); // Print back to USB
 }
 
 // Update LoRa communication UI status
