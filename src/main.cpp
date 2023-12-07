@@ -45,7 +45,7 @@
 #define METER_ARC_END_ANGLE 330
 
 // Maximum **REPORTED** throttle
-#define FULL_THROTTLE 100
+#define FULL_THROTTLE 65
 
 // Function declarations
 void update_throttle_display();
@@ -63,78 +63,58 @@ char rawMsg[5];
 unsigned long trip_odometer = 0;
 bool lora_communicating = false;
 
-
-// BaseType_t xTaskCreate(TaskFunction_t pvTaskCode,
-//                       const char * const pcName,
-//                       configSTACK_DEPTH_TYPE usStackDepth,
-//                       void *pvParameters,
-//                       UBaseType_t uxPriority,
-//                       TaskHandle_t *pxCreatedTask
-//                       );
-
-
-// /* Task to be created. */
-// void vTFT_Task(void * pvParameters)
-// {
-//     /* The parameter value is expected to be 1 as 1 is passed in the
-//     pvParameters value in the call to xTaskCreate() below. 
-//     configASSERT( ( ( uint32_t ) pvParameters ) == 1 );*/
-
-//     for( ;; )
-//     {
-//       /* Task code goes here. */
-//       // Update displays
-//       update_throttle_display();
-//       update_lora_icon();
-
-//       // If moving update odometer
-//       if (speed >= 0.5)
-//       {
-//         update_trip(0.1);  // Temporarily takes in a constant 0.01 miles
-//       }
-
-//     }
-// }
-
-// /* Function that creates a task. */
-// void vOtherFunction(void)
-// {
-// BaseType_t xReturned;
-// TaskHandle_t xHandle = NULL;
-
-//     /* Create the task, storing the handle. */
-//     xReturned = xTaskCreate(
-//         vTFT_Task,       /* Function that implements the task. */
-//         "UI_Update",     /* Text name for the task. */
-//         STACK_SIZE,      /* Stack size in words, not bytes. */
-//         ( void * ) 1,    /* Parameter passed into the task. */
-//         tskIDLE_PRIORITY,/* Priority at which the task is created. */
-//         &xHandle );      /* Used to pass out the created task's handle. */
-
-//     if( xReturned == pdPASS )
-//     {
-//         /* The task was created.  Use the task's handle to delete the task. */
-//         vTaskDelete( xHandle );
-//     }
-// }
-
-
-
-
 // For accessing display methods
 TFT_eSPI tft = TFT_eSPI();
+
+// See "How to Multitask with FreeRTOS - Simply Explained"
+// https://www.youtube.com/watch?v=WQGAs9MwXno
+// Here is a basic task creation
+void task_UpdateUI(void * parameters)
+{
+  for (;;){
+    // Stuff here that will run indefinitely
+    // Update displays
+    update_throttle_display();
+    update_lora_icon();
+
+    // If moving update odometer
+    if (speed >= 0.5)
+    {
+      update_trip(0.1);  // Temporarily takes in a constant 0.01 miles
+    }
+    // Serial.println("Task_UI happened");
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+  }
+}
+
+void task_sendLora(void * parameters)
+{
+  for (;;)
+  {
+    // Create char message and send
+    char msg[100] = "";
+	  sprintf(msg, "AT+SEND=%i,%i,%s", STM_Addr, strlen(rawMsg), rawMsg);
+	  Serial2.println(msg);
+    vTaskDelay(LoRa_Delay / portTICK_PERIOD_MS); // Delay for other tasks to run
+  }
+  
+}
 
 // Do this at start of run
 void setup() {
   
   // Initialize Serial2
   Serial2.begin(115200, SERIAL_8N1, RX_2, TX_2);
+
+  // Initialize Serial (This one reads back to USB)
+  Serial.begin(115200);
+
   delay(LoRa_Delay);
+  // Set parameters and check parameters
   Serial2.println("AT+IPR=115200");
   delay(LoRa_Delay);
   Serial2.println("AT+PARAMETER=10,8,1,4");
   delay(LoRa_Delay);
-  // Set parameters and check parameters
   Serial2.println("AT+ADDRESS=25");
   delay(LoRa_Delay);
   Serial2.println("AT+NETWORKID=3");
@@ -166,20 +146,40 @@ void setup() {
   // Shared text drawing parameters
   tft.setTextDatum(MC_DATUM);
   tft.setTextFont(8);
+
+  // Create the task as outlined above as "UI_Update"
+  xTaskCreate(
+        task_UpdateUI,  // task function name
+        "UI_Update",    // A description name of the task
+        1000,           // stack size
+        NULL,           // task parameters
+        1,              // task priority
+        NULL            // task handle
+        );
+
+  // // Create the task as outlined above as "send_LoRa"
+  // xTaskCreate(
+  //       task_sendLora,  // task function name
+  //       "send_LoRa",    // A description name of the task
+  //       1000,           // stack size
+  //       NULL,           // task parameters
+  //       1,              // task priority
+  //       NULL            // task handle
+  //       );
 }
 
 // Do this task indefinitely
 void loop() {
-  static int skip_display_update = 1000;
 
   // Read and process the throttle value
   uint16_t cur_throttle = analogRead(POT);
-  throttle = map(cur_throttle, 0, 4096, 0, 100); // Map throttle value between [0, 100]
+  throttle = map(cur_throttle, 1400, 2485, 0, 100); // Map throttle value between [0, 100]
+
+  throttle -= 20;
+  if (throttle < 0 || throttle > 100) throttle = 0; // Make sure 0 throttle doesn't go negative
+
   sprintf(rawMsg, "S%i", throttle);  // Convert the throttle into a char array to be sent
   sendLoRa();                              // Send throttle value via AT+ command
-
-  // Decrement the skip timer
-  skip_display_update -= 1;
 
   // Check for serial communication
   if (Serial2.available())
@@ -196,20 +196,6 @@ void loop() {
     // Serial.println("Nothing received");
   }
   delay(LoRa_Delay);
-
-  // Is this to give an artificial timer for the screen update?
-  if (!skip_display_update) {
-    // Update displays
-    update_throttle_display();
-    update_lora_icon();
-
-    // If moving update odometer
-    if (speed >= 0.5)
-    {
-      update_trip(0.1);  // Temporarily takes in a constant 0.01 miles
-    }
-  }
-  if (skip_display_update <= 0) skip_display_update = 1000;
 
 }
 
@@ -253,7 +239,7 @@ void display_speed()
   tft.drawNumber(speed, CENTER_X, CENTER_Y);
   // Adjust text size for speed units
   tft.setTextSize(2);
-  tft.drawCentreString("MPH", CENTER_X, 220, 1);
+  tft.drawCentreString("m/s", CENTER_X, 220, 1);
 
 }
 
@@ -271,12 +257,13 @@ void update_trip(float distance)
   // tft.drawNumber(trip_odometer, 30, 0); // Text is too big
 }
 
-// put function definitions here:
+// Create char message containing AT command and send it:
 void sendLoRa() {
   char msg[100] = "";
 	sprintf(msg, "AT+SEND=%i,%i,%s", STM_Addr, strlen(rawMsg), rawMsg);
 	Serial2.println(msg);
-	delay(LoRa_Delay);
+  //Serial.println("sendLoRa happened");
+  Serial.println(msg); // Print back to USB
 }
 
 // Update LoRa communication UI status
