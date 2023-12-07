@@ -9,11 +9,12 @@
 #include <string.h>
 
 // According to: https://circuits4you.com/2018/12/31/esp32-hardware-serial2-example/
-#define TX_2 17 // UART2 TX2 Pin
-#define RX_2 16 // UART2 RX2 Pin
-#define STM_Addr 24 // STM LoRa chip address (the longboard)
-#define ESP_Addr 25 // ESP LoRa chip address (this device)
-#define POT 34      // ADC
+#define TX_2 17        // UART2 TX2 Pin
+#define RX_2 16        // UART2 RX2 Pin
+#define STM_Addr 24    // STM LoRa chip address (the longboard)
+#define ESP_Addr 25    // ESP LoRa chip address (this device)
+#define POT 34         // ADC
+#define LoRa_Delay 250 // Delay ms to wait for smooth LoRa comms
 
 // Color defines
 #define DARKER_GREY 0x18E0
@@ -62,6 +63,64 @@ char rawMsg[5];
 unsigned long trip_odometer = 0;
 bool lora_communicating = false;
 
+
+// BaseType_t xTaskCreate(TaskFunction_t pvTaskCode,
+//                       const char * const pcName,
+//                       configSTACK_DEPTH_TYPE usStackDepth,
+//                       void *pvParameters,
+//                       UBaseType_t uxPriority,
+//                       TaskHandle_t *pxCreatedTask
+//                       );
+
+
+// /* Task to be created. */
+// void vTFT_Task(void * pvParameters)
+// {
+//     /* The parameter value is expected to be 1 as 1 is passed in the
+//     pvParameters value in the call to xTaskCreate() below. 
+//     configASSERT( ( ( uint32_t ) pvParameters ) == 1 );*/
+
+//     for( ;; )
+//     {
+//       /* Task code goes here. */
+//       // Update displays
+//       update_throttle_display();
+//       update_lora_icon();
+
+//       // If moving update odometer
+//       if (speed >= 0.5)
+//       {
+//         update_trip(0.1);  // Temporarily takes in a constant 0.01 miles
+//       }
+
+//     }
+// }
+
+// /* Function that creates a task. */
+// void vOtherFunction(void)
+// {
+// BaseType_t xReturned;
+// TaskHandle_t xHandle = NULL;
+
+//     /* Create the task, storing the handle. */
+//     xReturned = xTaskCreate(
+//         vTFT_Task,       /* Function that implements the task. */
+//         "UI_Update",     /* Text name for the task. */
+//         STACK_SIZE,      /* Stack size in words, not bytes. */
+//         ( void * ) 1,    /* Parameter passed into the task. */
+//         tskIDLE_PRIORITY,/* Priority at which the task is created. */
+//         &xHandle );      /* Used to pass out the created task's handle. */
+
+//     if( xReturned == pdPASS )
+//     {
+//         /* The task was created.  Use the task's handle to delete the task. */
+//         vTaskDelete( xHandle );
+//     }
+// }
+
+
+
+
 // For accessing display methods
 TFT_eSPI tft = TFT_eSPI();
 
@@ -70,29 +129,32 @@ void setup() {
   
   // Initialize Serial2
   Serial2.begin(115200, SERIAL_8N1, RX_2, TX_2);
-  delay(1000);
-
+  delay(LoRa_Delay);
+  Serial2.println("AT+IPR=115200");
+  delay(LoRa_Delay);
+  Serial2.println("AT+PARAMETER=10,8,1,4");
+  delay(LoRa_Delay);
   // Set parameters and check parameters
   Serial2.println("AT+ADDRESS=25");
-  delay(500);
+  delay(LoRa_Delay);
   Serial2.println("AT+NETWORKID=3");
-  delay(500);
+  delay(LoRa_Delay);
   Serial2.println("AT+CPIN?");
-  delay(500);
+  delay(LoRa_Delay);
   Serial2.println("AT+CRFOP?");
-  delay(500);
+  delay(LoRa_Delay);
   Serial2.println("AT+ADDRESS?");
-  delay(500);
+  delay(LoRa_Delay);
   Serial2.println("AT+NETWORKID?");
-  delay(500);
+  delay(LoRa_Delay);
   Serial2.println("AT+BAND?");
-  delay(500);
+  delay(LoRa_Delay);
   Serial2.println("AT+MODE=0");
-  delay(500);
+  delay(LoRa_Delay);
 
   // Initialize display
   tft.init();
-  tft.setRotation(ORIENTATION_LEFT_HAND);
+  tft.setRotation(ORIENTATION_RIGHT_HAND);
   tft.fillScreen(TFT_BLACK);
   
   // Initial drawing of spedometer
@@ -112,9 +174,7 @@ void loop() {
 
   // Read and process the throttle value
   uint16_t cur_throttle = analogRead(POT);
-  // throttle = map(cur_throttle, 0, 4096, 0, 100); // Map throttle value between [0, 100]
-  throttle = 25;
-  
+  throttle = map(cur_throttle, 0, 4096, 0, 100); // Map throttle value between [0, 100]
   sprintf(rawMsg, "S%i", throttle);  // Convert the throttle into a char array to be sent
   sendLoRa();                              // Send throttle value via AT+ command
 
@@ -125,17 +185,17 @@ void loop() {
   if (Serial2.available())
   {
     lora_communicating = true;
-    String junk = Serial2.readString();
-    String message = Serial2.readString();
-    Serial.println(junk);
-    Serial.println(message);
+    // String junk = Serial2.readString();
+    // String message = Serial2.readString();
+    // Serial.println(junk);
+    // Serial.println(message);
   } 
   else 
   {
     lora_communicating = false;
-    Serial.println("Nothing received");
+    // Serial.println("Nothing received");
   }
-  delay(500);
+  delay(LoRa_Delay);
 
   // Is this to give an artificial timer for the screen update?
   if (!skip_display_update) {
@@ -216,7 +276,7 @@ void sendLoRa() {
   char msg[100] = "";
 	sprintf(msg, "AT+SEND=%i,%i,%s", STM_Addr, strlen(rawMsg), rawMsg);
 	Serial2.println(msg);
-	delay(1000);
+	delay(LoRa_Delay);
 }
 
 // Update LoRa communication UI status
