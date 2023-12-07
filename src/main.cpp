@@ -173,7 +173,9 @@ void loop() {
 
   // Read and process the throttle value
   uint16_t cur_throttle = analogRead(POT);
+  // printf("Raw Throttle: %d\n", cur_throttle);
   throttle = map(cur_throttle, 1400, 2485, 0, 100); // Map throttle value between [0, 100]
+  // printf("Mapped Throttle: %d", throttle);
 
   throttle -= 20;
   if (throttle < 0 || throttle > 100) throttle = 0; // Make sure 0 throttle doesn't go negative
