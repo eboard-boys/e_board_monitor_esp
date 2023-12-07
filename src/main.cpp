@@ -182,7 +182,6 @@ void loop() {
   if (throttle < 0 || throttle > 100) throttle = 0; // Make sure 0 throttle doesn't go negative
 
   sprintf(rawMsg, "T%i", throttle);  // Convert the throttle into a char array to be sent
-  // sendLoRa();                              // Send throttle value via AT+ command
 
   // Check for serial communication
   if (Serial2.available())
