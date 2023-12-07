@@ -44,15 +44,14 @@
 #define METER_ARC_START_ANGLE 30
 #define METER_ARC_END_ANGLE 330
 
-// Maximum **REPORTED** throttle
-#define FULL_THROTTLE 80
+#define UI_FULL_THROTTLE 65 // Maximum **REPORTED** throttle
+#define POT_FULL_THROTTLE 80 // Maxium value to send over LoRa
 
 // Function declarations
 void update_throttle_display();
 void update_lora_icon();
 void update_trip(float distance);
 void display_speed();
-void sendLoRa();
 
 // Values are fetched from LoRa transceiver
 // Having them as globals allow them to be accessed easily across tasks
@@ -175,7 +174,7 @@ void loop() {
   // Read and process the throttle value
   uint16_t cur_throttle = analogRead(POT);
   // printf("Raw Throttle: %d\n", cur_throttle);
-  throttle = map(cur_throttle, 1400, 2485, 0, 100); // Map throttle value between [0, 100]
+  throttle = map(cur_throttle, 1400, 2485, 0, POT_FULL_THROTTLE); // Raw value range between 1400 and 2485 mapped to 0 to POT_FULL_THROTTLE value
   // printf("Mapped Throttle: %d", throttle);
 
   throttle -= 20;
@@ -206,7 +205,7 @@ void update_throttle_display() {
   static unsigned short last_angle = METER_ARC_START_ANGLE;
 
   // Calculate position on meter for a given speed
-  unsigned short cur_throttle_angle = map(throttle, 0, FULL_THROTTLE, METER_ARC_START_ANGLE, 
+  unsigned short cur_throttle_angle = map(throttle, 0, UI_FULL_THROTTLE, METER_ARC_START_ANGLE, 
     METER_ARC_END_ANGLE);
 
   // Only update the display on changes
