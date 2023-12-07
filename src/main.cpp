@@ -52,11 +52,7 @@
 void update_throttle_display();
 void update_lora_icon();
 void display_speed();
-<<<<<<< HEAD
 void display_trip();
-void sendLoRa();
-=======
->>>>>>> 3b1a179ff7a365968c8224a5215b77ea889fa32b
 
 // Values are fetched from LoRa transceiver
 // Having them as globals allow them to be accessed easily across tasks
