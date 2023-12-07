@@ -45,7 +45,7 @@
 #define METER_ARC_END_ANGLE 330
 
 // Maximum **REPORTED** throttle
-#define FULL_THROTTLE 65
+#define FULL_THROTTLE 80
 
 // Function declarations
 void update_throttle_display();
@@ -181,7 +181,7 @@ void loop() {
   throttle -= 20;
   if (throttle < 0 || throttle > 100) throttle = 0; // Make sure 0 throttle doesn't go negative
 
-  sprintf(rawMsg, "S%i", throttle);  // Convert the throttle into a char array to be sent
+  sprintf(rawMsg, "T%i", throttle);  // Convert the throttle into a char array to be sent
   // sendLoRa();                              // Send throttle value via AT+ command
 
   // Check for serial communication
