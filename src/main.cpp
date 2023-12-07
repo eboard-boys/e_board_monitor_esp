@@ -7,6 +7,7 @@
 #include <TFT_eWidget.h>  // Widget library
 #include <SD.h>
 #include <string.h>
+// #include <iostream>
 
 // According to: https://circuits4you.com/2018/12/31/esp32-hardware-serial2-example/
 #define TX_2 17        // UART2 TX2 Pin
@@ -50,8 +51,8 @@
 // Function declarations
 void update_throttle_display();
 void update_lora_icon();
-void update_trip(float distance);
 void display_speed();
+void display_trip();
 void sendLoRa();
 
 // Values are fetched from LoRa transceiver
@@ -62,7 +63,10 @@ byte battery_temp = 0;
 char rawMsg[5];
 unsigned long trip_odometer = 0;
 bool lora_communicating = false;
-
+String recv_buffer = "";
+char recv_data[10];
+char trip_read[10];
+  
 // For accessing display methods
 TFT_eSPI tft = TFT_eSPI();
 
@@ -80,9 +84,8 @@ void task_UpdateUI(void * parameters)
     // If moving update odometer
     if (speed >= 0.5)
     {
-      update_trip(0.1);  // Temporarily takes in a constant 0.01 miles
+      display_trip();  // Temporarily takes in a constant 0.01 miles
     }
-    // Serial.println("Task_UI happened");
     vTaskDelay(500 / portTICK_PERIOD_MS);
   }
 }
@@ -96,6 +99,47 @@ void task_sendLora(void * parameters)
 	  sprintf(msg, "AT+SEND=%i,%i,%s", STM_Addr, strlen(rawMsg), rawMsg);
 	  Serial2.println(msg);
     Serial.println(msg); // Print back to USB
+    vTaskDelay(LoRa_Delay / portTICK_PERIOD_MS); // Delay for other tasks to run
+  }
+}
+
+void task_readLora(void * parameters)
+{
+  for (;;)
+  {
+
+    if (Serial2.available())
+    {
+      lora_communicating = true;
+      
+      recv_buffer = Serial2.readString();     // Save received message
+      Serial.println(recv_buffer);            // Print received data to USB
+
+      sprintf(recv_data, "%i", recv_buffer);  // Save string recv_buffer to char array
+
+      Serial.println(recv_data[0]); // Print first character of received data
+
+      // If first char of recv_data == S update speed
+      if (recv_data[0] == 'S')
+      {
+        Serial.println("Speed received");
+        speed = atoi(recv_data);
+      }
+      
+      // If first char of recv_data == T update trip
+      else if (recv_data[0] == 'T')
+      {
+        Serial.println("Trip received");
+        sprintf(trip_read, "Trip: %i m", recv_buffer);  // Create text containing trip distance
+      }
+      else Serial.println("unknown received");
+      
+    }
+    else
+    {
+      lora_communicating = false;
+      Serial.println("Nothing received!");
+    }
     vTaskDelay(LoRa_Delay / portTICK_PERIOD_MS); // Delay for other tasks to run
   }
   
@@ -167,6 +211,16 @@ void setup() {
         1,              // task priority
         NULL            // task handle
         );
+
+  // Create the task as outlined above as "read_LoRa"
+  xTaskCreate(
+        task_readLora,  // task function name
+        "read_LoRa",    // A description name of the task
+        1000,           // stack size
+        NULL,           // task parameters
+        1,              // task priority
+        NULL            // task handle
+        );
 }
 
 // Do this task indefinitely
@@ -182,22 +236,6 @@ void loop() {
   if (throttle < 0 || throttle > 100) throttle = 0; // Make sure 0 throttle doesn't go negative
 
   sprintf(rawMsg, "T%i", throttle);  // Convert the throttle into a char array to be sent
-
-  // Check for serial communication
-  if (Serial2.available())
-  {
-    lora_communicating = true;
-    // String junk = Serial2.readString();
-    String message = Serial2.readString();
-    // Serial.println(junk);
-    // Serial.println(message);
-  } 
-  else 
-  {
-    lora_communicating = false;
-    // Serial.println("Nothing received");
-  }
-  delay(LoRa_Delay);
 
 }
 
@@ -230,9 +268,8 @@ void update_throttle_display() {
 // Read the received speed value and display on the LCD
 void display_speed()
 {
-  // Check if LoRa recieved speed
-  // Take the message and save only "S<number>"
-  speed = 13;
+  speed = 11; // Speed set to a constant for now
+
   // Ensure the colors are correct
   tft.setTextColor(TFT_WHITE, DARKER_GREY);
   // Reset Text Size
@@ -241,25 +278,16 @@ void display_speed()
   tft.drawNumber(speed, CENTER_X, CENTER_Y);
   // Adjust text size for speed units
   tft.setTextSize(2);
+  // Display the speed units
   tft.drawCentreString("m/s", CENTER_X, 220, 1);
 
 }
 
 // Keep track of total trip distance and display on the LCD
-void update_trip(float distance)
+void display_trip()
 {
-  // compound distance to the odometer
-  //trip_odometer += distance;
-  trip_odometer = distance;
-
-  String someText = "hello";
-  // Adjust text size for trip
-  tft.setTextSize(2);
-  // Display the odometer
-  //tft.drawString("Trip: 1.5 km", 75, 10, 1);
-  tft.drawString(someText, 75, 10, 1);
-  // tft.setTextSize(1);
-  // tft.drawNumber(trip_odometer, 30, 0); // Text is too big
+  tft.setTextSize(2);                          // Adjust text size for trip
+  tft.drawString(trip_read, 75, 10, 1);    // Display the odometer
 }
 
 // Update LoRa communication UI status
