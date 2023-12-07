@@ -39,21 +39,24 @@
 #define LORA_ICON_TOP (SIZE_X - LORA_ICON_RADIUS)
 
 // Spedometer UI constants
-#define SPEDOMETER_RADIUS 80  // Was 90
-#define METER_ARC_OUTSIDE (SPEDOMETER_RADIUS - 3)
+#define SPEEDOMETER_RADIUS 80  // Was 90
+#define METER_ARC_OUTSIDE (SPEEDOMETER_RADIUS - 3)
 #define METER_ARC_INSIDE METER_ARC_OUTSIDE - (METER_ARC_OUTSIDE / 5)
 #define METER_ARC_START_ANGLE 30
 #define METER_ARC_END_ANGLE 330
 
-// Maximum **REPORTED** throttle
-#define FULL_THROTTLE 80
+#define UI_FULL_THROTTLE 65 // Maximum **REPORTED** throttle
+#define POT_FULL_THROTTLE 80 // Maxium value to send over LoRa
 
 // Function declarations
 void update_throttle_display();
 void update_lora_icon();
 void display_speed();
+<<<<<<< HEAD
 void display_trip();
 void sendLoRa();
+=======
+>>>>>>> 3b1a179ff7a365968c8224a5215b77ea889fa32b
 
 // Values are fetched from LoRa transceiver
 // Having them as globals allow them to be accessed easily across tasks
@@ -182,9 +185,9 @@ void setup() {
   tft.setRotation(ORIENTATION_RIGHT_HAND);
   tft.fillScreen(TFT_BLACK);
   
-  // Initial drawing of spedometer
-  tft.fillCircle(CENTER_X, CENTER_Y, SPEDOMETER_RADIUS, DARKER_GREY);
-  tft.drawSmoothCircle(CENTER_X, CENTER_Y, SPEDOMETER_RADIUS, TFT_SILVER, DARKER_GREY);
+  // Initial drawing of speedometer
+  tft.fillCircle(CENTER_X, CENTER_Y, SPEEDOMETER_RADIUS, DARKER_GREY);
+  tft.drawSmoothCircle(CENTER_X, CENTER_Y, SPEEDOMETER_RADIUS, TFT_SILVER, DARKER_GREY);
   tft.drawArc(CENTER_X, CENTER_Y, METER_ARC_OUTSIDE, METER_ARC_INSIDE, METER_ARC_START_ANGLE, 
     METER_ARC_END_ANGLE, TFT_BLACK, DARKER_GREY);
 
@@ -229,7 +232,7 @@ void loop() {
   // Read and process the throttle value
   uint16_t cur_throttle = analogRead(POT);
   // printf("Raw Throttle: %d\n", cur_throttle);
-  throttle = map(cur_throttle, 1400, 2485, 0, 100); // Map throttle value between [0, 100]
+  throttle = map(cur_throttle, 1400, 2485, 0, POT_FULL_THROTTLE); // Raw value range between 1400 and 2485 mapped to 0 to POT_FULL_THROTTLE value
   // printf("Mapped Throttle: %d", throttle);
 
   throttle -= 20;
@@ -239,12 +242,12 @@ void loop() {
 
 }
 
-// Update the spedometer UI display
+// Update the speedometer UI display
 void update_throttle_display() {
   static unsigned short last_angle = METER_ARC_START_ANGLE;
 
   // Calculate position on meter for a given speed
-  unsigned short cur_throttle_angle = map(throttle, 0, FULL_THROTTLE, METER_ARC_START_ANGLE, 
+  unsigned short cur_throttle_angle = map(throttle, 0, UI_FULL_THROTTLE, METER_ARC_START_ANGLE, 
     METER_ARC_END_ANGLE);
 
   // Only update the display on changes
