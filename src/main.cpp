@@ -68,8 +68,8 @@ char rawMsg[5];
 unsigned long trip_odometer = 0;
 bool lora_communicating = false;
 String recv_buffer = "";
-char recv_data[10];
-char trip_read[10];
+char recv_data[10] = "init";
+char trip_read[10] = "init";
   
 // For accessing display methods
 TFT_eSPI tft = TFT_eSPI();
@@ -127,14 +127,16 @@ void task_readLora(void * parameters)
       if (recv_data[0] == 'S')
       {
         Serial.println("Speed received");
-        speed = atoi(recv_data);
+        // TODO remove first character from recv_data
+        speed = atoi(recv_data);  // Set speed equal to int conversion of data
       }
       
       // If first char of recv_data == T update trip
       else if (recv_data[0] == 'D')
       {
         Serial.println("Trip received");
-        sprintf(trip_read, "Trip: %i m", recv_buffer);  // Create text containing trip distance
+        // TODO remove first character from recv_data
+        sprintf(trip_read, "Trip: %i m", recv_data);  // Create text containing trip distance
       }
       else Serial.println("unknown received");
       
@@ -289,7 +291,7 @@ void display_speed()
 // Keep track of total trip distance and display on the LCD
 void display_trip()
 {
-  tft.setTextSize(2);                          // Adjust text size for trip
+  tft.setTextSize(2);                      // Adjust text size for trip
   tft.drawString(trip_read, 75, 10, 1);    // Display the odometer
   // tft.drawString("Trip: 1.3km", 75, 10, 1);    // Display the odometer
 }
