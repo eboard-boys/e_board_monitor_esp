@@ -15,6 +15,8 @@
 #define ESP_Addr 25    // ESP LoRa chip address (this device)
 #define POT 34         // ADC
 #define LoRa_Delay 250 // Delay ms to wait for smooth LoRa comms
+#define MPStoMPH 2.24  // For converting M/S to MPH
+#define MeterToMile 0.000621
 
 // Color defines
 #define DARKER_GREY 0x18E0
@@ -68,7 +70,7 @@ unsigned long trip_odometer = 0;
 bool lora_communicating = false;
 String recv_buffer = "";
 char recv_data[10];
-char trip_read[10] = "init";
+char trip_read[20] = "init";
   
 // For accessing display methods
 TFT_eSPI tft = TFT_eSPI();
@@ -110,6 +112,9 @@ void task_readLora(void * parameters)
     if (Serial2.available())
     {
       lora_communicating = true;
+
+      sprintf(trip_read, "Trip: 220 m");  // temp code
+      Serial.println("Lora is communicating");
       
       recv_buffer = Serial2.readString();     // Save received message
       Serial.println(recv_buffer);            // Print received data to USB
@@ -123,6 +128,11 @@ void task_readLora(void * parameters)
       {
         // TODO remove first character from recv_data
         speed = atoi(recv_data);  // Set speed equal to int conversion of data
+
+        speed = speed * MPStoMPH; // Convert speed M/S to MPH
+
+        if (speed < 0) speed = 0;
+        else if (speed > 20) speed = 15;
       }
       
       // If first char of recv_data == T update trip
@@ -276,7 +286,7 @@ void display_speed()
   // Adjust text size for speed units
   tft.setTextSize(2);
   // Display the speed units
-  tft.drawCentreString("m/s", CENTER_X, 220, 1);
+  tft.drawCentreString("MPH", CENTER_X, 220, 1);
 }
 
 // Keep track of total trip distance and display on the LCD
