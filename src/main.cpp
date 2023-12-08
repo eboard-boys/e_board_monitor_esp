@@ -38,25 +38,26 @@
 #define LORA_ICON_LEFT (SIZE_X - LORA_ICON_DIAMETER)
 #define LORA_ICON_TOP (SIZE_X - LORA_ICON_RADIUS)
 
-// Spedometer UI constants
+// Speedometer UI constants
 #define SPEEDOMETER_RADIUS 80  // Was 90
 #define METER_ARC_OUTSIDE (SPEEDOMETER_RADIUS - 3)
 #define METER_ARC_INSIDE METER_ARC_OUTSIDE - (METER_ARC_OUTSIDE / 5)
 #define METER_ARC_START_ANGLE 30
 #define METER_ARC_END_ANGLE 330
 
-#define UI_FULL_THROTTLE 65 // Maximum **REPORTED** throttle
+// Raw throttle ranges
+#define MIN_RAW_THROTTLE 1590
+#define MAX_RAW_THROTTLE 2160
+
+// Maximum mapped throttle
+#define UI_FULL_THROTTLE 80 // Maximum **REPORTED** throttle for UI
 #define POT_FULL_THROTTLE 80 // Maxium value to send over LoRa
 
 // Function declarations
 void update_throttle_display();
 void update_lora_icon();
 void display_speed();
-<<<<<<< HEAD
 void display_trip();
-void sendLoRa();
-=======
->>>>>>> 3b1a179ff7a365968c8224a5215b77ea889fa32b
 
 // Values are fetched from LoRa transceiver
 // Having them as globals allow them to be accessed easily across tasks
@@ -130,7 +131,7 @@ void task_readLora(void * parameters)
       }
       
       // If first char of recv_data == T update trip
-      else if (recv_data[0] == 'T')
+      else if (recv_data[0] == 'D')
       {
         Serial.println("Trip received");
         sprintf(trip_read, "Trip: %i m", recv_buffer);  // Create text containing trip distance
@@ -232,11 +233,12 @@ void loop() {
   // Read and process the throttle value
   uint16_t cur_throttle = analogRead(POT);
   // printf("Raw Throttle: %d\n", cur_throttle);
-  throttle = map(cur_throttle, 1400, 2485, 0, POT_FULL_THROTTLE); // Raw value range between 1400 and 2485 mapped to 0 to POT_FULL_THROTTLE value
-  // printf("Mapped Throttle: %d", throttle);
-
-  throttle -= 20;
-  if (throttle < 0 || throttle > 100) throttle = 0; // Make sure 0 throttle doesn't go negative
+  // printf("%d\n", cur_throttle);
+  if (cur_throttle < MIN_RAW_THROTTLE || cur_throttle > 4000) cur_throttle = MIN_RAW_THROTTLE; // Clamp values less than min to min (make sure throttle not negative)
+  else if (cur_throttle > MAX_RAW_THROTTLE ) cur_throttle = MAX_RAW_THROTTLE; // Clamp values greater than max to max
+  // printf("Clamped Throttle: %d\n", cur_throttle);
+  throttle = map(cur_throttle, MIN_RAW_THROTTLE, MAX_RAW_THROTTLE, 0, POT_FULL_THROTTLE);
+  // printf("Mapped Throttle: %d\n", throttle);
 
   sprintf(rawMsg, "T%i", throttle);  // Convert the throttle into a char array to be sent
 
@@ -271,8 +273,6 @@ void update_throttle_display() {
 // Read the received speed value and display on the LCD
 void display_speed()
 {
-  speed = 11; // Speed set to a constant for now
-
   // Ensure the colors are correct
   tft.setTextColor(TFT_WHITE, DARKER_GREY);
   // Reset Text Size
@@ -291,6 +291,7 @@ void display_trip()
 {
   tft.setTextSize(2);                          // Adjust text size for trip
   tft.drawString(trip_read, 75, 10, 1);    // Display the odometer
+  // tft.drawString("Trip: 1.3km", 75, 10, 1);    // Display the odometer
 }
 
 // Update LoRa communication UI status
