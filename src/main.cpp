@@ -7,7 +7,6 @@
 #include <TFT_eWidget.h>  // Widget library
 #include <SD.h>
 #include <string.h>
-// #include <iostream>
 
 // According to: https://circuits4you.com/2018/12/31/esp32-hardware-serial2-example/
 #define TX_2 17        // UART2 TX2 Pin
@@ -68,7 +67,7 @@ char rawMsg[5];
 unsigned long trip_odometer = 0;
 bool lora_communicating = false;
 String recv_buffer = "";
-char recv_data[10] = "init";
+char recv_data[10];
 char trip_read[10] = "init";
   
 // For accessing display methods
@@ -84,12 +83,8 @@ void task_UpdateUI(void * parameters)
     // Update displays
     update_throttle_display();
     update_lora_icon();
+    display_trip();
 
-    // If moving update odometer
-    if (speed >= 0.5)
-    {
-      display_trip();  // Temporarily takes in a constant 0.01 miles
-    }
     vTaskDelay(500 / portTICK_PERIOD_MS);
   }
 }
@@ -102,7 +97,7 @@ void task_sendLora(void * parameters)
     char msg[100] = "";
 	  sprintf(msg, "AT+SEND=%i,%i,%s", STM_Addr, strlen(rawMsg), rawMsg);
 	  Serial2.println(msg);
-    Serial.println(msg); // Print back to USB
+    // Serial.println(msg); // Print back to USB
     vTaskDelay(LoRa_Delay / portTICK_PERIOD_MS); // Delay for other tasks to run
   }
 }
@@ -126,7 +121,6 @@ void task_readLora(void * parameters)
       // If first char of recv_data == S update speed
       if (recv_data[0] == 'S')
       {
-        Serial.println("Speed received");
         // TODO remove first character from recv_data
         speed = atoi(recv_data);  // Set speed equal to int conversion of data
       }
@@ -134,17 +128,17 @@ void task_readLora(void * parameters)
       // If first char of recv_data == T update trip
       else if (recv_data[0] == 'D')
       {
-        Serial.println("Trip received");
         // TODO remove first character from recv_data
         sprintf(trip_read, "Trip: %i m", recv_data);  // Create text containing trip distance
       }
-      else Serial.println("unknown received");
+      // Else the message is unknown
+      else Serial.println("Recv - ???");
       
     }
     else
     {
       lora_communicating = false;
-      Serial.println("Nothing received!");
+      Serial.println("Recv - NULL");
     }
     vTaskDelay(LoRa_Delay / portTICK_PERIOD_MS); // Delay for other tasks to run
   }
@@ -224,14 +218,13 @@ void setup() {
         "read_LoRa",    // A description name of the task
         1000,           // stack size
         NULL,           // task parameters
-        1,              // task priority
+        2,              // task priority
         NULL            // task handle
         );
 }
 
 // Do this task indefinitely
 void loop() {
-
   // Read and process the throttle value
   uint16_t cur_throttle = analogRead(POT);
   // printf("Raw Throttle: %d\n", cur_throttle);
@@ -243,7 +236,6 @@ void loop() {
   // printf("Mapped Throttle: %d\n", throttle);
 
   sprintf(rawMsg, "T%i", throttle);  // Convert the throttle into a char array to be sent
-
 }
 
 // Update the speedometer UI display
@@ -285,7 +277,6 @@ void display_speed()
   tft.setTextSize(2);
   // Display the speed units
   tft.drawCentreString("m/s", CENTER_X, 220, 1);
-
 }
 
 // Keep track of total trip distance and display on the LCD
@@ -293,7 +284,6 @@ void display_trip()
 {
   tft.setTextSize(2);                      // Adjust text size for trip
   tft.drawString(trip_read, 75, 10, 1);    // Display the odometer
-  // tft.drawString("Trip: 1.3km", 75, 10, 1);    // Display the odometer
 }
 
 // Update LoRa communication UI status
